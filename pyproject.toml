@@ -9,6 +9,8 @@ packages = [{include = "map_kmn"}]
 [tool.poetry.dependencies]
 python = "^3.11"
 python-dotenv = "^1.0.0"
+requests = "^2.31.0"
+beautifulsoup4 = "^4.12.2"
 
 [tool.poetry.group.dev.dependencies]
 isort = "^5.12.0"
