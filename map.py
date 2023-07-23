@@ -164,9 +164,9 @@ if __name__ == "__main__":
                 "title": title,
             }
         )
-        print(title)
-
         raindrops_to_marked.append(item["_id"])
+        print(title)
+        
     r = move_marked_raindrop(unmark, raindrops_to_marked, marked, token)
     r = move_marked_raindrop(unmark, raindrops_not_found, notfound, token)
     r = create_raindrop(unmark_kmn, raindrops_to_unmark_kmn, token)
