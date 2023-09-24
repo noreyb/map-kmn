@@ -1,9 +1,11 @@
 import os
 import time
+import re
 
 import requests
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
+from playwright.sync_api import sync_playwright
 
 
 def get_from_raindrop(collection_id, access_token):
@@ -109,7 +111,21 @@ def to_kmn_url(link, service):
         r = requests.get(link)
         soup = BeautifulSoup(r.text, "html.parser")
         meta = soup.find("meta", property="og:image")
-        user_id = meta["content"].split("/")[9]
+        user_id = None
+        if len(meta["content"].split("/")) < 9:
+            with sync_playwright() as p:
+                browser = p.chromium.launch()
+                page = browser.new_page()
+                page.goto(link)
+                page.get_by_role("button", name=re.compile("はい", re.IGNORECASE)).click()
+                c = page.content()
+                s = BeautifulSoup(c, "html.parser")
+                user_id = list(s.find_all("div", style=lambda value: value and "background-image:" in value))[0]["style"].split("\"")[1].split("/")[9]
+                page.screenshot(path="hogehgoehoge.png")
+                browser.close()
+        else:
+            user_id = meta["content"].split("/")[9]
+        print(user_id)
         key = "fanbox"
        
     else:
