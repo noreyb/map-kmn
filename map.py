@@ -1,6 +1,6 @@
 import os
-import time
 import re
+import time
 
 import requests
 from bs4 import BeautifulSoup
@@ -120,14 +120,23 @@ def to_kmn_url(link, service):
                 page.get_by_role("button", name=re.compile("はい", re.IGNORECASE)).click()
                 c = page.content()
                 s = BeautifulSoup(c, "html.parser")
-                user_id = list(s.find_all("div", style=lambda value: value and "background-image:" in value))[0]["style"].split("\"")[1].split("/")[9]
+                user_id = (
+                    list(
+                        s.find_all(
+                            "div",
+                            style=lambda value: value and "background-image:" in value,
+                        )
+                    )[0]["style"]
+                    .split('"')[1]
+                    .split("/")[9]
+                )
                 page.screenshot(path="hogehgoehoge.png")
                 browser.close()
         else:
             user_id = meta["content"].split("/")[9]
         print(user_id)
         key = "fanbox"
-       
+
     else:
         return None
 
@@ -163,7 +172,11 @@ if __name__ == "__main__":
     raindrops_to_unmark_kmn = []
     for item in resp.json()["items"]:
         domain = item["domain"]
-        if ("fanbox" not in domain) and ("fantia" not in domain) and ("patreon" not in domain):
+        if (
+            ("fanbox" not in domain)
+            and ("fantia" not in domain)
+            and ("patreon" not in domain)
+        ):
             print("not supported site found")
             continue
 
@@ -182,7 +195,7 @@ if __name__ == "__main__":
         )
         raindrops_to_marked.append(item["_id"])
         print(title)
-        
+
     r = move_marked_raindrop(unmark, raindrops_to_marked, marked, token)
     r = move_marked_raindrop(unmark, raindrops_not_found, notfound, token)
     r = create_raindrop(unmark_kmn, raindrops_to_unmark_kmn, token)
