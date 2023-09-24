@@ -114,7 +114,7 @@ def to_kmn_url(link, service):
         user_id = None
         if len(meta["content"].split("/")) < 9:
             with sync_playwright() as p:
-                browser = p.chromium.launch(headless=False, slow_mo=50)
+                browser = p.chromium.launch(headless=True)
                 page = browser.new_page()
                 page.goto(link)
                 page.get_by_role("button", name=re.compile("はい", re.IGNORECASE)).click()
