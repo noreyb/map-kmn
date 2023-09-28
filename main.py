@@ -167,7 +167,7 @@ if __name__ == "__main__":
     kmn_subscribe = int(os.getenv("KMN"))
 
     resp = get_raindrops(subscribe, token)
-    items = resp.json["items"]
+    items = resp.json()["items"]
     tags = ["fansite_notfound", "fansite_marked"]
     items = fetch_tagged_raindrops(items, tags, has_tag=False)
     if len(items) == 0:
