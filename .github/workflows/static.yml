@@ -23,4 +23,4 @@ jobs:
       - uses: Gr1N/setup-poetry@v8
       - run: poetry install --no-root
       - run: poetry run playwright install chromium
-      - run: RAINDROPIO_ACCESS_TOKEN=${{secrets.RAINDROPIO_ACCESS_TOKEN}} UNMARK=${{secrets.UNMARK}} MARKED=${{secrets.MARKED}} NOTFOUND=${{secrets.NOTFOUND}} KMN=${{secrets.KMN}} poetry run python map.py
+      - run: RD_TOKEN=${{secrets.RD_TOKEN}} SUBSCRIBE=${{secrets.SUBSCRIBE}} KMN=${{secrets.KMN}} poetry run python main.py
