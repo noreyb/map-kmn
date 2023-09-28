@@ -8,54 +8,61 @@ from dotenv import load_dotenv
 from playwright.sync_api import sync_playwright
 
 
-def get_from_raindrop(collection_id, access_token):
+def get_raindrops(collection_id, token):
     url = "https://api.raindrop.io/rest/v1"
     endpoint = "/raindrops"
     headers = {
         "Content-Type": "application/json",
-        "Authorization": f"Bearer {access_token}",
+        "Authorization": f"Bearer {token}",
     }
     query = {
         "perpage": 50,
     }
 
-    resp = requests.get(
+    r = requests.get(
         f"{url}{endpoint}/{collection_id}",
         headers=headers,
         params=query,
     )
 
-    if resp.status_code != requests.codes.ok:
-        print(resp.text)
+    if r.status_code != requests.codes.ok:
+        print(r.text)
         exit()
 
     time.sleep(1)
-    return resp
+    return r
 
 
-def move_marked_raindrop(unmark, items, marked, access_token):
+def fetch_tagged_raindrops(items, tags, has_tag=True):
+    filtered_items = []
+    for item in items:
+        for tag in item["tags"]:
+            if tag in tags:
+                filtered_items.append(item)
+
+    if has_tag:
+        return filtered_items
+    else:
+        return [item for item in items if item["_id"] not in [fi["_id"] for fi in filtered_items]]
+
+
+def tag_raindrop(items, collection, tag, token):
     url = "https://api.raindrop.io/rest/v1"
     endpoint = "/raindrops"
-    headers = {
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {access_token}",
-    }
-    query = {
-        # "sort": "domain",
-        # "page": 1,
-        "perpage": 50,
-        # "dengerAll": True,
-    }
-    body = {
-        "ids": items,
-        "collectionId": marked,
-    }
 
+    tags = [tag]
     resp = requests.put(
-        f"{url}{endpoint}/{unmark}",
-        headers=headers,
-        params=query,
-        json=body,
+        f"{url}{endpoint}/{collection}",
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {token}",
+        },
+        params={"perpage": 50},
+        json={
+            "ids": items,
+            "collectionId": collection,
+            "tags": tags,
+        },
     )
 
     if resp.status_code != requests.codes.ok:
@@ -66,7 +73,7 @@ def move_marked_raindrop(unmark, items, marked, access_token):
     return resp
 
 
-def create_raindrop(collection_id, items, access_token):
+def create_raindrop(items, collection_id, access_token):
     url = "https://api.raindrop.io/rest/v1"
     endpoint = "/raindrops"
     headers = {
@@ -155,22 +162,22 @@ def is_exist_kmn(url):
 
 if __name__ == "__main__":
     load_dotenv()
-    token = os.getenv("RAINDROPIO_ACCESS_TOKEN")
-    unmark = int(os.getenv("UNMARK"))  # collection_id
-    marked = int(os.getenv("MARKED"))
-    notfound = int(os.getenv("NOTFOUND"))
-    unmark_kmn = int(os.getenv("KMN"))
+    token = os.getenv("RD_TOKEN")
+    subscribe = int(os.getenv("SUBSCRIBE"))  # collection_id
+    kmn_subscribe = int(os.getenv("KMN"))
 
-    resp = get_from_raindrop(unmark, token)
-    if resp.json()["count"] == 0:
-        print("There is no unmark raindrops")
-        exit()
+    resp = get_raindrops(subscribe, token)
+    items = resp.json["items"]
+    tags = ["fansite_notfound", "fansite_marked"]
+    items = fetch_tagged_raindrops(items, tags, has_tag=False)
+    if len(items) == 0:
+        exit("No new item")
 
-    # Get suppot site raindrops
-    raindrops_to_marked = []
-    raindrops_not_found = []
-    raindrops_to_unmark_kmn = []
-    for item in resp.json()["items"]:
+    # Get support site raindrops
+    marked_id = []
+    not_found_id = []
+    kmn_id = []
+    for item in items:
         domain = item["domain"]
         if (
             ("fanbox" not in domain)
@@ -182,20 +189,20 @@ if __name__ == "__main__":
 
         r = to_kmn_url(item["link"], domain)
         if not is_exist_kmn(r.url):
-            raindrops_not_found.append(item["_id"])
+            not_found_id.append(item["_id"])
             continue
 
         soup = BeautifulSoup(r.text, "html.parser")
         title = soup.find("title").text
-        raindrops_to_unmark_kmn.append(
+        kmn_id.append(
             {
                 "link": r.url,
                 "title": title,
             }
         )
-        raindrops_to_marked.append(item["_id"])
+        marked_id.append(item["_id"])
         print(title)
 
-    r = move_marked_raindrop(unmark, raindrops_to_marked, marked, token)
-    r = move_marked_raindrop(unmark, raindrops_not_found, notfound, token)
-    r = create_raindrop(unmark_kmn, raindrops_to_unmark_kmn, token)
+    r = tag_raindrop(marked_id, subscribe, "fansite_marked", token)
+    r = tag_raindrop(not_found_id, subscribe, "fansite_notfound", token)
+    r = create_raindrop(kmn_id, kmn_subscribe, token)
