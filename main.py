@@ -119,6 +119,8 @@ def to_kmn_url(link, service):
         soup = BeautifulSoup(r.text, "html.parser")
         meta = soup.find("meta", property="og:image")
         user_id = None
+        if meta["content"] is None:
+            return None
         if len(meta["content"].split("/")) < 9:
             with sync_playwright() as p:
                 browser = p.chromium.launch(headless=True)
@@ -137,7 +139,7 @@ def to_kmn_url(link, service):
                     .split('"')[1]
                     .split("/")[9]
                 )
-                page.screenshot(path="hogehgoehoge.png")
+                # page.screenshot(path="hogehgoehoge.png")
                 browser.close()
         else:
             user_id = meta["content"].split("/")[9]
@@ -203,6 +205,9 @@ if __name__ == "__main__":
         marked_id.append(item["_id"])
         print(title)
 
-    r = tag_raindrop(marked_id, subscribe, "fansite_marked", token)
-    r = tag_raindrop(not_found_id, subscribe, "fansite_notfound", token)
-    r = create_raindrop(kmn_id, kmn_subscribe, token)
+    if marked_id:
+        r = tag_raindrop(marked_id, subscribe, "fansite_marked", token)
+    if not_found_id:
+        r = tag_raindrop(not_found_id, subscribe, "fansite_notfound", token)
+    if kmn_id:
+        r = create_raindrop(kmn_id, kmn_subscribe, token)

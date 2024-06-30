@@ -22,5 +22,5 @@ jobs:
           python-version: "3.11"
       - uses: Gr1N/setup-poetry@v8
       - run: poetry install --no-root
-      - run: poetry run playwright install chromium
+      - run: poetry run playwright install chromium --with-deps
       - run: RD_TOKEN=${{secrets.RD_TOKEN}} SUBSCRIBE=${{secrets.SUBSCRIBE}} KMN=${{secrets.KMN}} poetry run python main.py
