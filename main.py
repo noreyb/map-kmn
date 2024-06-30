@@ -206,6 +206,6 @@ if __name__ == "__main__":
     if marked_id:
         r = tag_raindrop(marked_id, subscribe, "fansite_marked", token)
     if not_nound_id:
-    r = tag_raindrop(not_found_id, subscribe, "fansite_notfound", token)
+        r = tag_raindrop(not_found_id, subscribe, "fansite_notfound", token)
     if kmn_id:
-    r = create_raindrop(kmn_id, kmn_subscribe, token)
+        r = create_raindrop(kmn_id, kmn_subscribe, token)
