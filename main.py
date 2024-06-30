@@ -119,6 +119,8 @@ def to_kmn_url(link, service):
         soup = BeautifulSoup(r.text, "html.parser")
         meta = soup.find("meta", property="og:image")
         user_id = None
+        if meta["content"] is None:
+            return None
         if len(meta["content"].split("/")) < 9:
             with sync_playwright() as p:
                 browser = p.chromium.launch(headless=True)
