@@ -1,4 +1,5 @@
 import os
+import random
 import re
 import time
 
@@ -15,22 +16,48 @@ def get_raindrops(collection_id, token):
         "Content-Type": "application/json",
         "Authorization": f"Bearer {token}",
     }
+    n_page = 0
+    while True:
+        query = {
+            "perpage": 50,
+            "page": n_page,
+        }
+
+        resp = requests.get(
+            f"{url}{endpoint}/{collection_id}",
+            headers=headers,
+            params=query,
+        )
+
+        if resp.status_code != requests.codes.ok:
+            print(resp.text)
+            exit()
+
+        time.sleep(1)
+        count = len(resp.json()["items"])
+        if count == 0:
+            break
+        n_page += 1
+
+    total_page = n_page
+    n_page = random.randint(0, total_page - 1)
+    print(f"total_page: {total_page}, n_page: {n_page}")
     query = {
         "perpage": 50,
+        "page": n_page,
     }
-
-    r = requests.get(
+    resp = requests.get(
         f"{url}{endpoint}/{collection_id}",
         headers=headers,
         params=query,
     )
 
-    if r.status_code != requests.codes.ok:
-        print(r.text)
+    if resp.status_code != requests.codes.ok:
+        print(resp.text)
         exit()
-
     time.sleep(1)
-    return r
+    return resp
+
 
 
 def fetch_tagged_raindrops(items, tags, has_tag=True):
