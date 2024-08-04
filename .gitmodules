@@ -1,0 +1,3 @@
+[submodule "raindropio"]
+	path = raindropio
+	url = https://github.com/noreyb/raindropio

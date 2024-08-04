@@ -7,234 +7,164 @@ import requests
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 from playwright.sync_api import sync_playwright
+from raindropio.domain.raindrop import Raindrop
+from raindropio.domain.raindrop_id import RaindropId
+from raindropio.repository.raindropio import RaindropIO
 
 
-def get_raindrops(collection_id, token):
-    url = "https://api.raindrop.io/rest/v1"
-    endpoint = "/raindrops"
-    headers = {
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {token}",
-    }
-    n_page = 0
-    while True:
-        query = {
-            "perpage": 50,
-            "page": n_page,
-        }
+def id_in_fantia(link):
+    return link.split("/")[-1]
 
-        resp = requests.get(
-            f"{url}{endpoint}/{collection_id}",
-            headers=headers,
-            params=query,
-        )
+def id_in_fanbox(link):
+    r = requests.get(link)
 
-        if resp.status_code != requests.codes.ok:
-            print(resp.text)
-            exit()
+    user_id = None
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page()
+        page.goto(link)
 
-        time.sleep(1)
-        count = len(resp.json()["items"])
-        if count == 0:
-            break
-        n_page += 1
-
-    total_page = n_page
-    n_page = random.randint(0, total_page - 1)
-    print(f"total_page: {total_page}, n_page: {n_page}")
-    query = {
-        "perpage": 50,
-        "page": n_page,
-    }
-    resp = requests.get(
-        f"{url}{endpoint}/{collection_id}",
-        headers=headers,
-        params=query,
-    )
-
-    if resp.status_code != requests.codes.ok:
-        print(resp.text)
-        exit()
-    time.sleep(1)
-    return resp
+        try:
+            yes_button = page.get_by_role("button", name=re.compile("はい", re.IGNORECASE))
+            if yes_button.is_visible():
+                yes_button.click()
+        except TimeoutError:
+            print("No confirm button")
 
 
+        content = page.content()
+        soup = BeautifulSoup(content, "html.parser")
 
-def fetch_tagged_raindrops(items, tags, has_tag=True):
-    filtered_items = []
-    for item in items:
-        for tag in item["tags"]:
-            if tag in tags:
-                filtered_items.append(item)
+        divs = soup.find_all("div", style=True)
+        for d in divs:
+            if "background-image" in d["style"]:
+                user_id = d['style'].split('\"')[1].split('/')[9]
+                break
 
-    if has_tag:
-        return filtered_items
-    else:
-        return [item for item in items if item["_id"] not in [fi["_id"] for fi in filtered_items]]
+        browser.close()
+    return user_id
 
-
-def tag_raindrop(items, collection, tag, token):
-    url = "https://api.raindrop.io/rest/v1"
-    endpoint = "/raindrops"
-
-    tags = [tag]
-    resp = requests.put(
-        f"{url}{endpoint}/{collection}",
-        headers={
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {token}",
-        },
-        params={"perpage": 50},
-        json={
-            "ids": items,
-            "collectionId": collection,
-            "tags": tags,
-        },
-    )
-
-    if resp.status_code != requests.codes.ok:
-        print(resp.text)
-        exit(1)
-
-    time.sleep(1)
-    return resp
-
-
-def create_raindrop(items, collection_id, access_token):
-    url = "https://api.raindrop.io/rest/v1"
-    endpoint = "/raindrops"
-    headers = {
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {access_token}",
-    }
-    query = {
-        # "sort": "domain",
-        # "page": 1,
-        "perpage": 50,
-        # "dengerAll": True,
-    }
-
-    for item in items:
-        item["collectionId"] = collection_id
-    body = {"items": items}
-
-    resp = requests.post(
-        f"{url}{endpoint}",
-        headers=headers,
-        params=query,
-        json=body,
-    )
-
-    if resp.status_code != requests.codes.ok:
-        print(resp.text)
-        exit(1)
-
-    time.sleep(1)
-    return resp
+def id_in_patreon(link):
+    return link.split("=")[-1]  # これとユーザー名verのurlがある
 
 
 def to_kmn_url(link, service):
     user_id = None
+
     if "fantia" in service:
-        user_id = link.split("/")[-1]
+        user_id = id_in_fantia(link)
         key = "fantia"
+
     elif "patreon" in service:
-        user_id = link.split("=")[-1]
+        user_id = id_in_patreon(link)
         key = "patreon"
+
     elif "fanbox" in service:
-        r = requests.get(link)
-        soup = BeautifulSoup(r.text, "html.parser")
-        meta = soup.find("meta", property="og:image")
-        user_id = None
-        if meta["content"] is None:
-            return None
-        if len(meta["content"].split("/")) < 9:
-            with sync_playwright() as p:
-                browser = p.chromium.launch(headless=True)
-                page = browser.new_page()
-                page.goto(link)
-                page.get_by_role("button", name=re.compile("はい", re.IGNORECASE)).click()
-                c = page.content()
-                s = BeautifulSoup(c, "html.parser")
-                user_id = (
-                    list(
-                        s.find_all(
-                            "div",
-                            style=lambda value: value and "background-image:" in value,
-                        )
-                    )[0]["style"]
-                    .split('"')[1]
-                    .split("/")[9]
-                )
-                # page.screenshot(path="hogehgoehoge.png")
-                browser.close()
-        else:
-            user_id = meta["content"].split("/")[9]
-        print(user_id)
+        user_id = id_in_fanbox(link)
         key = "fanbox"
 
     else:
         return None
 
-    resp = requests.get(f"https://www.kemono.su/{key}/user/{user_id}")
+    if user_id is None:
+        return None
+
+    resp = requests.get(f"https://kemono.su/{key}/user/{user_id}")
     time.sleep(1)
-    return resp
+
+    url = resp.url
+    # soup = BeautifulSoup(resp.text, "html.parser")
+    # title = soup.find("title").text
+
+    return url
 
 
 def is_exist_kmn(url):
-    if "https://www.kemono.su/artists" == url:
+    if "https://kemono.su/artists" == url:
         print("There is no user pages in kemono")
         return False
     else:
         return True
 
 
+def raindrops_without_specific_tags(raindrops: list, tags: list):
+    result = []
+    for r in raindrops:
+        for t in tags:
+            if t not in r.tags:
+                result.append(r)
+
+    return result
+
+
 if __name__ == "__main__":
+    # 変数設定
     load_dotenv()
     token = os.getenv("RD_TOKEN")
-    subscribe = int(os.getenv("SUBSCRIBE"))  # collection_id
-    kmn_subscribe = int(os.getenv("KMN"))
+    fansite = int(os.getenv("FANSITE"))  # collection_id
+    kmn_subscribe = int(os.getenv("KEMONO"))  # collection_id
 
-    resp = get_raindrops(subscribe, token)
-    items = resp.json()["items"]
+    # Raindropのハンドラーを設定
+    handler = RaindropIO(token)
+    raindrops = handler.bulk_get_all(fansite)
+
+    # 特定のタグがないraindropを取得
     tags = ["fansite_notfound", "fansite_marked"]
-    items = fetch_tagged_raindrops(items, tags, has_tag=False)
-    if len(items) == 0:
-        exit("No new item")
+    raindrops = raindrops_without_specific_tags(raindrops, tags)
+    # items = fetch_tagged_raindrops(items, tags, has_tag=False)
+    if len(raindrops) == 0:
+        raise Exception("No new item")
 
     # Get support site raindrops
-    marked_id = []
-    not_found_id = []
-    kmn_id = []
-    for item in items:
-        domain = item["domain"]
-        if (
-            ("fanbox" not in domain)
-            and ("fantia" not in domain)
-            and ("patreon" not in domain)
-        ):
-            print("not supported site found")
+    # support_sites = ["fanbox", "fantia", "patreon"]
+    support_sites = ["fanbox", "fantia"]  # patreonのidを安定して取得する方法がわかるまで除く
+    marked_raindrops = []
+    notfound_raindrops = []
+    kmn_raindrops = []
+    for r in raindrops:
+
+        # 対応外のサイトはスキップする
+        for s in support_sites:
+            if s not in r.link:
+                continue
+
+        for s in support_sites:
+            if s in r.link:
+                domain = s
+        kmn_url = to_kmn_url(r.link, domain)
+
+        if kmn_url is None:
             continue
 
-        r = to_kmn_url(item["link"], domain)
-        if not is_exist_kmn(r.url):
-            not_found_id.append(item["_id"])
-            continue
-
-        soup = BeautifulSoup(r.text, "html.parser")
-        title = soup.find("title").text
-        kmn_id.append(
-            {
-                "link": r.url,
-                "title": title,
-            }
+        # Raindrop に詰めなおす
+        tmp = Raindrop(
+            link = r.link,
+            _id = RaindropId(r._id),
         )
-        marked_id.append(item["_id"])
-        print(title)
+        if not is_exist_kmn(kmn_url):
+            notfound_raindrops.append(tmp)
+            print(f"notfound: {kmn_url}")
+            continue
+        else:
+            marked_raindrops.append(tmp)
+            print(f"marked: {kmn_url}")
 
-    if marked_id:
-        r = tag_raindrop(marked_id, subscribe, "fansite_marked", token)
-    if not_found_id:
-        r = tag_raindrop(not_found_id, subscribe, "fansite_notfound", token)
-    if kmn_id:
-        r = create_raindrop(kmn_id, kmn_subscribe, token)
+        kmn_raindrops.append(
+            Raindrop(
+                link = kmn_url,
+                collection_id = kmn_subscribe,
+            )
+        )
+
+        time.sleep(1)
+
+    if marked_raindrops:
+        # r = tag_raindrop(marked_id, subscribe, "fansite_marked", token)
+        handler.bulk_update(fansite, marked_raindrops, ["fansite_marked"], fansite)
+    if notfound_raindrops:
+        # r = tag_raindrop(not_found_id, subscribe, "fansite_notfound", token)
+        handler.bulk_update(fansite, notfound_raindrops, ["fansite_notfound"], fansite)
+    if kmn_raindrops:
+        # r = create_raindrop(kmn_id, kmn_subscribe, token)
+        handler.bulk_create(kmn_raindrops)
+
